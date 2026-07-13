@@ -1,0 +1,56 @@
+name: Run Monthly Analysis
+
+on:
+  push:
+    branches:
+      - analytics/run-monthly-analysis
+  workflow_dispatch: {}
+
+jobs:
+  run-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy matplotlib seaborn plotly openpyxl scipy
+
+      - name: Run analysis script
+        run: |
+          # ensure target file exists
+          if [ ! -f "月报数据（模拟非真实）.xlsx" ]; then
+            echo "ERROR: 找不到 Excel 文件 月报数据（模拟非真实）.xlsx 在仓库根目录。"
+            ls -la
+            exit 1
+          fi
+          python analysis.py "月报数据（模拟非真实）.xlsx"
+
+      - name: Commit and push outputs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add analysis_outputs || true
+          if git diff --staged --quiet; then
+            echo "No output changes to commit"
+          else
+            git commit -m "Add analysis outputs (auto)" || true
+            git push origin HEAD
+          fi
+
+      - name: Upload outputs as workflow artifact (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-outputs
+          path: analysis_outputs/
